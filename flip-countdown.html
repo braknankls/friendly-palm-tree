@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flip Countdown Clock</title>
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Bebas+Neue&family=Black+Ops+One&family=Bungee&family=Orbitron:wght@700&family=Oswald:wght@700&family=Rajdhani:wght@700&family=Russo+One&family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:         #0d0d0d;
+    --card-top:   #252525;
+    --card-bot:   #181818;
+    --digit:      #e8a020;
+    --glow:       rgba(232,160,32,0.25);
+    --sep:        #e8a020;
+    --fold-line:  #0d0d0d;
+    --clock-font: 'Bebas Neue', Impact, 'Arial Black', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    transition: background 0.35s;
+  }
+
+  /* ── Editable heading ── */
+  .clock-message {
+    color: #888;
+    font-size: 11px;
+    letter-spacing: 8px;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    margin-bottom: 36px;
+    outline: none;
+    border-bottom: 1px solid transparent;
+    padding: 4px 10px;
+    min-width: 100px;
+    text-align: center;
+    cursor: text;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .clock-message:hover  { border-color: #2e2e2e; }
+  .clock-message:focus  { border-color: #484848; color: #aaa; }
+  .clock-message:empty::before {
+    content: attr(data-placeholder);
+    color: #2e2e2e;
+    pointer-events: none;
+  }
+
+  /* ── Flip clock layout ── */
+  .flip-clock {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .flip-unit { display: flex; flex-direction: column; align-items: center; }
+  .flip-digits { display: flex; gap: 4px; }
+  .unit-label {
+    margin-top: 10px;
+    color: #333;
+    font-size: 9px;
+    letter-spacing: 4px;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+  }
+
+  /* ── Separators ── */
+  .sep {
+    font-size: 76px;
+    color: var(--sep);
+    line-height: 100px;
+    padding: 0 2px;
+    user-select: none;
+    font-family: var(--clock-font);
+    text-shadow: 0 0 18px var(--glow);
+    transition: opacity 0.12s, color 0.35s, text-shadow 0.35s;
+  }
+  .sep.off { opacity: 0.12; }
+
+  /* ── Flip card ── */
+  .flip-card {
+    position: relative;
+    width: 72px;
+    height: 100px;
+    perspective: 280px;
+    border-radius: 7px;
+    box-shadow: 0 6px 16px rgba(0,0,0,.7), 0 2px 4px rgba(0,0,0,.9),
+                inset 0 1px 0 rgba(255,255,255,.04);
+  }
+  .flip-card::after {
+    content: '';
+    position: absolute; left: 0; right: 0;
+    top: calc(50% - 1px); height: 2px;
+    background: var(--fold-line);
+    z-index: 20; pointer-events: none;
+    transition: background 0.35s;
+  }
+
+  .card-top, .card-bottom, .flip-top, .flip-bottom {
+    position: absolute; left: 0; right: 0; overflow: hidden;
+  }
+  .card-top, .flip-top {
+    top: 0; height: 50%; border-radius: 7px 7px 0 0;
+    background: var(--card-top); transition: background 0.35s;
+  }
+  .card-bottom, .flip-bottom {
+    bottom: 0; height: 50%; border-radius: 0 0 7px 7px;
+    background: var(--card-bot); transition: background 0.35s;
+  }
+  .card-top::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to bottom, rgba(255,255,255,.03), rgba(0,0,0,.18));
+    pointer-events: none;
+  }
+  .card-bottom::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,.3), rgba(0,0,0,.05));
+    pointer-events: none;
+  }
+
+  /* ── Digit text ── */
+  .card-top .digit, .card-bottom .digit,
+  .flip-top .digit, .flip-bottom .digit {
+    position: absolute; left: 0; right: 0;
+    height: 200%;
+    display: flex; justify-content: center; align-items: center;
+    font-size: 86px;
+    font-family: var(--clock-font);
+    color: var(--digit);
+    text-shadow: 0 0 20px var(--glow), 0 2px 0 rgba(0,0,0,.6);
+    user-select: none;
+    transition: color 0.35s, text-shadow 0.35s;
+  }
+  .card-top .digit, .flip-top .digit   { top: 0; }
+  .card-bottom .digit, .flip-bottom .digit { bottom: 0; }
+
+  /* ── Animated panels ── */
+  .flip-top  { transform-origin: center bottom; transform: rotateX(0deg);  z-index: 10; }
+  .flip-top::before {
+    content: ''; position: absolute; inset: 0;
+    background: transparent; transition: background .25s ease-in;
+    pointer-events: none; z-index: 2; border-radius: 7px 7px 0 0;
+  }
+  .flipping .flip-top::before { background: rgba(0,0,0,.55); }
+  .flip-bottom { transform-origin: center top; transform: rotateX(90deg); z-index: 10; }
+
+  .flipping .flip-top    { animation: fold-away .25s ease-in  forwards; }
+  .flipping .flip-bottom { animation: fold-in   .25s ease-out .25s forwards; }
+  @keyframes fold-away { from{transform:rotateX(0)} to{transform:rotateX(-90deg)} }
+  @keyframes fold-in   { from{transform:rotateX(90deg)} to{transform:rotateX(0)} }
+
+  /* ── Expired notice ── */
+  .expired-msg {
+    margin-top: 28px;
+    color: #8b3a00; font-size: 11px; letter-spacing: 6px;
+    font-family: 'Courier New', monospace; text-transform: uppercase;
+    opacity: 0; transition: opacity .8s; min-height: 1.2em;
+  }
+  .expired-msg.show { opacity: 1; }
+
+  /* ── Settings panel ── */
+  .settings {
+    margin-top: 48px;
+    width: 100%; max-width: 520px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .setting-row {
+    display: grid; grid-template-columns: 76px 1fr;
+    align-items: center; gap: 12px;
+  }
+  .setting-label {
+    color: #363636; font-size: 9px; letter-spacing: 3px;
+    font-family: 'Courier New', monospace; text-transform: uppercase;
+    white-space: nowrap; text-align: right;
+  }
+  .settings select,
+  .settings input[type="datetime-local"] {
+    background: #111; border: 1px solid #222; color: #666;
+    padding: 8px 10px; border-radius: 4px;
+    font-family: 'Courier New', monospace; font-size: 12px;
+    outline: none; color-scheme: dark; cursor: pointer; width: 100%;
+    transition: border-color .2s;
+  }
+  .settings select:focus,
+  .settings input:focus { border-color: var(--digit); color: #999; }
+  .settings select option { background: #111; }
+
+  .color-row { display: flex; gap: 20px; align-items: center; }
+  .color-item { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .color-item span {
+    color: #363636; font-size: 8px; letter-spacing: 2px;
+    font-family: 'Courier New', monospace; text-transform: uppercase;
+  }
+  input[type="color"] {
+    width: 38px; height: 28px;
+    border: 1px solid #2a2a2a; border-radius: 4px;
+    background: none; padding: 2px; cursor: pointer;
+    outline: none; -webkit-appearance: none; appearance: none;
+    transition: border-color .2s;
+  }
+  input[type="color"]:hover { border-color: #444; }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
+
+  .settings-divider { border: none; border-top: 1px solid #1a1a1a; margin: 4px 0; }
+
+  /* ── Embed button ── */
+  .embed-wrap {
+    margin-top: 32px;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .embed-btn {
+    background: transparent;
+    border: 1px solid #2a2a2a;
+    color: #555;
+    padding: 11px 28px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color .2s, color .2s, background .2s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .embed-btn svg { flex-shrink: 0; transition: stroke .2s; }
+  .embed-btn:hover {
+    border-color: var(--digit);
+    color: var(--digit);
+    background: rgba(0,0,0,.2);
+  }
+  .embed-btn:hover svg { stroke: var(--digit) !important; }
+  .embed-btn:active { transform: translateY(1px); }
+  .embed-note {
+    color: #2a2a2a; font-size: 9px; letter-spacing: 2px;
+    font-family: 'Courier New', monospace; text-transform: uppercase;
+    text-align: center;
+  }
+
+  /* ── Toast notification ── */
+  .toast {
+    position: fixed; bottom: 28px; left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    background: #101018; border: 1px solid var(--digit);
+    color: var(--digit);
+    padding: 10px 22px; border-radius: 4px;
+    font-family: 'Courier New', monospace; font-size: 11px;
+    letter-spacing: 3px; text-transform: uppercase;
+    opacity: 0; transition: opacity .3s, transform .3s;
+    pointer-events: none; z-index: 9999;
+  }
+  .toast.show {
+    opacity: 1; transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<div class="clock-message" id="clockMessage"
+     contenteditable="true" spellcheck="false"
+     data-placeholder="Click to add a message">Countdown</div>
+
+<div class="flip-clock">
+  <div class="flip-unit">
+    <div class="flip-digits">
+      <div class="flip-card" id="d0"></div>
+      <div class="flip-card" id="d1"></div>
+    </div>
+    <div class="unit-label">Days</div>
+  </div>
+  <span class="sep" id="sep0">:</span>
+  <div class="flip-unit">
+    <div class="flip-digits">
+      <div class="flip-card" id="h0"></div>
+      <div class="flip-card" id="h1"></div>
+    </div>
+    <div class="unit-label">Hours</div>
+  </div>
+  <span class="sep" id="sep1">:</span>
+  <div class="flip-unit">
+    <div class="flip-digits">
+      <div class="flip-card" id="m0"></div>
+      <div class="flip-card" id="m1"></div>
+    </div>
+    <div class="unit-label">Minutes</div>
+  </div>
+  <span class="sep" id="sep2">:</span>
+  <div class="flip-unit">
+    <div class="flip-digits">
+      <div class="flip-card" id="s0"></div>
+      <div class="flip-card" id="s1"></div>
+    </div>
+    <div class="unit-label">Seconds</div>
+  </div>
+</div>
+
+<div class="expired-msg" id="expiredMsg">— Time's Up —</div>
+
+<!-- Settings -->
+<div class="settings">
+  <hr class="settings-divider">
+
+  <div class="setting-row">
+    <span class="setting-label">Font</span>
+    <select id="fontSelect">
+      <option value="'Bebas Neue', Impact, sans-serif">Bebas Neue — Classic Display</option>
+      <option value="'Orbitron', sans-serif">Orbitron — Sci-Fi Digital</option>
+      <option value="'Oswald', Impact, sans-serif">Oswald — Bold Condensed</option>
+      <option value="'Rajdhani', sans-serif">Rajdhani — Geometric Sans</option>
+      <option value="'VT323', monospace">VT323 — Pixel Terminal</option>
+      <option value="'Share Tech Mono', monospace">Share Tech Mono — Tech Mono</option>
+      <option value="'Black Ops One', Impact, sans-serif">Black Ops One — Military</option>
+      <option value="'Audiowide', sans-serif">Audiowide — Futuristic</option>
+      <option value="'Russo One', Impact, sans-serif">Russo One — Bold Clean</option>
+      <option value="'Bungee', Impact, sans-serif">Bungee — Retro Display</option>
+    </select>
+  </div>
+
+  <div class="setting-row">
+    <span class="setting-label">Colors</span>
+    <div class="color-row">
+      <div class="color-item">
+        <span>Background</span>
+        <input type="color" id="colorBg"    value="#0d0d0d">
+      </div>
+      <div class="color-item">
+        <span>Card</span>
+        <input type="color" id="colorCard"  value="#222222">
+      </div>
+      <div class="color-item">
+        <span>Digits</span>
+        <input type="color" id="colorDigit" value="#e8a020">
+      </div>
+    </div>
+  </div>
+
+  <div class="setting-row">
+    <span class="setting-label">Target</span>
+    <input type="datetime-local" id="targetDT">
+  </div>
+</div>
+
+<!-- Embed -->
+<div class="embed-wrap">
+  <button class="embed-btn" id="embedBtn">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+         stroke="#555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+    </svg>
+    Copy Embed Code
+  </button>
+  <p class="embed-note">Paste into Canvas HTML editor &mdash; requires JavaScript enabled</p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Helpers ──────────────────────────────────────────────
+  const pad = n => String(Math.max(0, Math.floor(n))).padStart(2, '0');
+  const z2  = n => String(n).padStart(2, '0');
+  const root = document.documentElement;
+
+  function hexToRgb(hex) {
+    return [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function shiftHex(hex, delta) {
+    return '#' + hexToRgb(hex)
+      .map(c => clamp(c + delta, 0, 255).toString(16).padStart(2, '0'))
+      .join('');
+  }
+  function hexAlpha(hex, a) {
+    const [r, g, b] = hexToRgb(hex);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+  function toInputVal(d) {
+    return `${d.getFullYear()}-${z2(d.getMonth()+1)}-${z2(d.getDate())}` +
+           `T${z2(d.getHours())}:${z2(d.getMinutes())}`;
+  }
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Google Fonts slug per font-family value ───────────────
+  const FONT_SLUGS = {
+    "'Bebas Neue', Impact, sans-serif":        'Bebas+Neue',
+    "'Orbitron', sans-serif":                  'Orbitron:wght@700',
+    "'Oswald', Impact, sans-serif":            'Oswald:wght@700',
+    "'Rajdhani', sans-serif":                  'Rajdhani:wght@700',
+    "'VT323', monospace":                      'VT323',
+    "'Share Tech Mono', monospace":            'Share+Tech+Mono',
+    "'Black Ops One', Impact, sans-serif":     'Black+Ops+One',
+    "'Audiowide', sans-serif":                 'Audiowide',
+    "'Russo One', Impact, sans-serif":         'Russo+One',
+    "'Bungee', Impact, sans-serif":            'Bungee',
+  };
+
+  // ── Default target: 1 hr from now ────────────────────────
+  let target = new Date(Date.now() + 60 * 60 * 1000);
+
+  // ── DOM refs ──────────────────────────────────────────────
+  const msgEl      = document.getElementById('clockMessage');
+  const fontSel    = document.getElementById('fontSelect');
+  const colorBg    = document.getElementById('colorBg');
+  const colorCard  = document.getElementById('colorCard');
+  const colorDigit = document.getElementById('colorDigit');
+  const dtInput    = document.getElementById('targetDT');
+  const expiredMsg = document.getElementById('expiredMsg');
+  const embedBtn   = document.getElementById('embedBtn');
+  const toastEl    = document.getElementById('toast');
+  const seps       = ['sep0','sep1','sep2'].map(id => document.getElementById(id));
+
+  // ── Theme ─────────────────────────────────────────────────
+  function applyColors() {
+    const bg = colorBg.value, card = colorCard.value, digit = colorDigit.value;
+    root.style.setProperty('--bg',        bg);
+    root.style.setProperty('--fold-line', bg);
+    root.style.setProperty('--card-top',  shiftHex(card, 14));
+    root.style.setProperty('--card-bot',  shiftHex(card, -10));
+    root.style.setProperty('--digit',     digit);
+    root.style.setProperty('--sep',       digit);
+    root.style.setProperty('--glow',      hexAlpha(digit, 0.28));
+  }
+  function applyFont(val) { root.style.setProperty('--clock-font', val); }
+
+  // ── Persistence ───────────────────────────────────────────
+  const STORE = 'flipClockV2';
+  function save() {
+    try {
+      localStorage.setItem(STORE, JSON.stringify({
+        msg: msgEl.textContent.trim(), font: fontSel.value,
+        bg: colorBg.value, card: colorCard.value, digit: colorDigit.value,
+        tgt: target.toISOString(),
+      }));
+    } catch(e) {}
+  }
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE) || 'null');
+      if (!s) return;
+      if (s.msg)   msgEl.textContent = s.msg;
+      if (s.font)  { fontSel.value = s.font; applyFont(s.font); }
+      if (s.bg)    colorBg.value    = s.bg;
+      if (s.card)  colorCard.value  = s.card;
+      if (s.digit) colorDigit.value = s.digit;
+      if (s.bg || s.card || s.digit) applyColors();
+      if (s.tgt)   { target = new Date(s.tgt); dtInput.value = toInputVal(target); }
+    } catch(e) {}
+  }
+
+  // ── Flip card logic ───────────────────────────────────────
+  function buildCard(el, digit) {
+    el.innerHTML =
+      `<div class="card-top"><div class="digit">${digit}</div></div>` +
+      `<div class="card-bottom"><div class="digit">${digit}</div></div>` +
+      `<div class="flip-top"><div class="digit">${digit}</div></div>` +
+      `<div class="flip-bottom"><div class="digit">${digit}</div></div>`;
+    el.dataset.v = digit;
+  }
+  function setCard(el, next) {
+    const prev = el.dataset.v;
+    if (prev === next) return;
+    el.dataset.v = next;
+    const ctD = el.querySelector('.card-top .digit');
+    const cbD = el.querySelector('.card-bottom .digit');
+    const ftD = el.querySelector('.flip-top .digit');
+    const fbD = el.querySelector('.flip-bottom .digit');
+    ftD.textContent = prev; fbD.textContent = next; ctD.textContent = next;
+    el.classList.remove('flipping');
+    void el.offsetWidth;
+    el.classList.add('flipping');
+    setTimeout(() => { cbD.textContent = next; ftD.textContent = next; el.classList.remove('flipping'); }, 560);
+  }
+
+  const cardIds = ['d0','d1','h0','h1','m0','m1','s0','s1'];
+  const cards = {};
+  cardIds.forEach(id => { cards[id] = document.getElementById(id); buildCard(cards[id], '0'); });
+
+  // ── Tick ──────────────────────────────────────────────────
+  let sepOn = true;
+  function tick() {
+    const diff  = Math.max(0, Math.floor((target - Date.now()) / 1000));
+    const days  = Math.min(Math.floor(diff / 86400), 99);
+    const hours = Math.floor((diff % 86400) / 3600);
+    const mins  = Math.floor((diff % 3600) / 60);
+    const secs  = diff % 60;
+    const ds = pad(days), hs = pad(hours), ms = pad(mins), ss = pad(secs);
+    setCard(cards.d0,ds[0]); setCard(cards.d1,ds[1]);
+    setCard(cards.h0,hs[0]); setCard(cards.h1,hs[1]);
+    setCard(cards.m0,ms[0]); setCard(cards.m1,ms[1]);
+    setCard(cards.s0,ss[0]); setCard(cards.s1,ss[1]);
+    sepOn = !sepOn;
+    const cls = (diff > 0 && !sepOn) ? 'sep off' : 'sep';
+    seps.forEach(s => s.className = cls);
+    if (diff === 0) expiredMsg.classList.add('show');
+    else expiredMsg.classList.remove('show');
+  }
+
+  // ── Generate embed HTML ───────────────────────────────────
+  function generateEmbed() {
+    const msg    = msgEl.textContent.trim() || 'Countdown';
+    const font   = fontSel.value;
+    const bg     = colorBg.value;
+    const card   = colorCard.value;
+    const digit  = colorDigit.value;
+    const ctop   = shiftHex(card, 14);
+    const cbot   = shiftHex(card, -10);
+    const glow   = hexAlpha(digit, 0.28);
+    const tgtISO = target.toISOString();
+    // Unique ID so multiple embeds on same page don't collide
+    const uid    = 'fcc' + Math.random().toString(36).slice(2, 9);
+    const gfSlug = FONT_SLUGS[font] || 'Bebas+Neue';
+
+    const css =
+`@import url('https://fonts.googleapis.com/css2?family=${gfSlug}&display=swap');
+#${uid}{background:${bg};display:flex;flex-direction:column;align-items:center;padding:36px 20px;box-sizing:border-box;width:100%}
+#${uid} .fcc-msg{color:#888;font-size:11px;letter-spacing:8px;font-family:'Courier New',monospace;text-transform:uppercase;margin-bottom:32px;text-align:center}
+#${uid} .fcc-clk{display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;justify-content:center}
+#${uid} .fcc-unit{display:flex;flex-direction:column;align-items:center}
+#${uid} .fcc-digs{display:flex;gap:4px}
+#${uid} .fcc-lbl{margin-top:10px;color:#333;font-size:9px;letter-spacing:4px;font-family:'Courier New',monospace;text-transform:uppercase}
+#${uid} .fcc-sep{font-size:76px;color:${digit};line-height:100px;padding:0 2px;user-select:none;font-family:${font};text-shadow:0 0 18px ${glow};transition:opacity .12s}
+#${uid} .fcc-sep.off{opacity:.12}
+#${uid} .fcc-card{position:relative;width:72px;height:100px;perspective:280px;border-radius:7px;box-shadow:0 6px 16px rgba(0,0,0,.7),0 2px 4px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.04)}
+#${uid} .fcc-card::after{content:'';position:absolute;left:0;right:0;top:calc(50% - 1px);height:2px;background:${bg};z-index:20;pointer-events:none}
+#${uid} .fcc-ct,#${uid} .fcc-ft{position:absolute;top:0;left:0;right:0;height:50%;overflow:hidden;border-radius:7px 7px 0 0;background:${ctop}}
+#${uid} .fcc-cb,#${uid} .fcc-fb{position:absolute;bottom:0;left:0;right:0;height:50%;overflow:hidden;border-radius:0 0 7px 7px;background:${cbot}}
+#${uid} .fcc-ct::after{content:'';position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(to bottom,rgba(255,255,255,.03),rgba(0,0,0,.18));pointer-events:none}
+#${uid} .fcc-cb::after{content:'';position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(to bottom,rgba(0,0,0,.3),rgba(0,0,0,.05));pointer-events:none}
+#${uid} .fcc-ct .fcc-d,#${uid} .fcc-cb .fcc-d,#${uid} .fcc-ft .fcc-d,#${uid} .fcc-fb .fcc-d{position:absolute;left:0;right:0;height:200%;display:flex;justify-content:center;align-items:center;font-size:86px;font-family:${font};color:${digit};text-shadow:0 0 20px ${glow},0 2px 0 rgba(0,0,0,.6);user-select:none}
+#${uid} .fcc-ct .fcc-d,#${uid} .fcc-ft .fcc-d{top:0}
+#${uid} .fcc-cb .fcc-d,#${uid} .fcc-fb .fcc-d{bottom:0}
+#${uid} .fcc-ft{transform-origin:center bottom;transform:rotateX(0deg);z-index:10}
+#${uid} .fcc-ft::before{content:'';position:absolute;top:0;right:0;bottom:0;left:0;background:transparent;transition:background .25s ease-in;pointer-events:none;z-index:2;border-radius:7px 7px 0 0}
+#${uid} .flipping .fcc-ft::before{background:rgba(0,0,0,.55)}
+#${uid} .fcc-fb{transform-origin:center top;transform:rotateX(90deg);z-index:10}
+#${uid} .flipping .fcc-ft{animation:fccA_${uid} .25s ease-in forwards}
+#${uid} .flipping .fcc-fb{animation:fccB_${uid} .25s ease-out .25s forwards}
+#${uid} .fcc-exp{color:#8b3a00;font-size:11px;letter-spacing:6px;font-family:'Courier New',monospace;text-transform:uppercase;opacity:0;transition:opacity .8s;margin-top:24px;min-height:1.2em;text-align:center}
+#${uid} .fcc-exp.show{opacity:1}
+@keyframes fccA_${uid}{from{transform:rotateX(0)}to{transform:rotateX(-90deg)}}
+@keyframes fccB_${uid}{from{transform:rotateX(90deg)}to{transform:rotateX(0)}}`;
+
+    const card2 = (id) => `<div class="fcc-card" id="${id}${uid}"></div>`;
+    const unit  = (lbl, a, b) =>
+      `<div class="fcc-unit"><div class="fcc-digs">${card2(a)}${card2(b)}</div>` +
+      `<div class="fcc-lbl">${lbl}</div></div>`;
+
+    const html =
+`<div id="${uid}">
+  <p class="fcc-msg">${escHtml(msg)}</p>
+  <div class="fcc-clk">
+    ${unit('Days','d0','d1')}
+    <span class="fcc-sep">:</span>
+    ${unit('Hours','h0','h1')}
+    <span class="fcc-sep">:</span>
+    ${unit('Minutes','m0','m1')}
+    <span class="fcc-sep">:</span>
+    ${unit('Seconds','s0','s1')}
+  </div>
+  <div class="fcc-exp"></div>
+</div>`;
+
+    // Compact JS — uses ES5-compatible helpers for broadest browser support
+    const js =
+`(function(){
+var U='${uid}',target=new Date('${tgtISO}');
+function pad(n){n=Math.max(0,Math.floor(n));return(n<10?'0':'')+n}
+var wrap=document.getElementById(U);
+var seps=wrap.querySelectorAll('.fcc-sep');
+var exp=wrap.querySelector('.fcc-exp');
+function build(el,d){
+  el.innerHTML='<div class="fcc-ct"><div class="fcc-d">'+d+'</div></div>'+
+    '<div class="fcc-cb"><div class="fcc-d">'+d+'</div></div>'+
+    '<div class="fcc-ft"><div class="fcc-d">'+d+'</div></div>'+
+    '<div class="fcc-fb"><div class="fcc-d">'+d+'</div></div>';
+  el.dataset.v=d;
+}
+function flip(el,n){
+  var p=el.dataset.v; if(p===n)return; el.dataset.v=n;
+  var ctd=el.querySelector('.fcc-ct .fcc-d'),cbd=el.querySelector('.fcc-cb .fcc-d'),
+      ftd=el.querySelector('.fcc-ft .fcc-d'),fbd=el.querySelector('.fcc-fb .fcc-d');
+  ftd.textContent=p; fbd.textContent=n; ctd.textContent=n;
+  el.classList.remove('flipping'); void el.offsetWidth; el.classList.add('flipping');
+  setTimeout(function(){cbd.textContent=n;ftd.textContent=n;el.classList.remove('flipping')},560);
+}
+var ids=['d0','d1','h0','h1','m0','m1','s0','s1'],cards={};
+ids.forEach(function(id){var el=document.getElementById(id+U);build(el,'0');cards[id]=el});
+var on=true;
+function tick(){
+  var diff=Math.max(0,Math.floor((target-Date.now())/1000));
+  var d=Math.min(Math.floor(diff/86400),99),h=Math.floor((diff%86400)/3600),
+      m=Math.floor((diff%3600)/60),s=diff%60;
+  var ds=pad(d),hs=pad(h),ms=pad(m),ss=pad(s);
+  flip(cards.d0,ds[0]);flip(cards.d1,ds[1]);
+  flip(cards.h0,hs[0]);flip(cards.h1,hs[1]);
+  flip(cards.m0,ms[0]);flip(cards.m1,ms[1]);
+  flip(cards.s0,ss[0]);flip(cards.s1,ss[1]);
+  on=!on;
+  var cls=(diff>0&&!on)?'fcc-sep off':'fcc-sep';
+  seps.forEach(function(s){s.className=cls});
+  if(diff===0)exp.classList.add('show');else exp.classList.remove('show');
+  if(diff===0)exp.textContent='— Time’s Up —';
+}
+tick(); setInterval(tick,1000);
+})();`;
+
+    return `<!-- Flip Countdown Clock -->\n<style>\n${css}\n</style>\n\n${html}\n\n<script>\n${js}\n<\/script>`;
+  }
+
+  // ── Toast ─────────────────────────────────────────────────
+  let toastTimer;
+  function showToast(msg) {
+    clearTimeout(toastTimer);
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2800);
+  }
+
+  // ── Embed button ──────────────────────────────────────────
+  embedBtn.addEventListener('click', () => {
+    const code = generateEmbed();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code)
+        .then(() => showToast('Embed code copied to clipboard'))
+        .catch(() => fallbackCopy(code));
+    } else {
+      fallbackCopy(code);
+    }
+  });
+
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try {
+      document.execCommand('copy');
+      showToast('Embed code copied to clipboard');
+    } catch(e) {
+      showToast('Copy failed — try Ctrl+C');
+    }
+    document.body.removeChild(ta);
+  }
+
+  // ── Wire controls ─────────────────────────────────────────
+  dtInput.value = toInputVal(target);
+  dtInput.addEventListener('change', () => {
+    if (dtInput.value) { target = new Date(dtInput.value); save(); }
+    expiredMsg.classList.remove('show');
+  });
+  fontSel.addEventListener('change', () => { applyFont(fontSel.value); save(); });
+  [colorBg, colorCard, colorDigit].forEach(el =>
+    el.addEventListener('input', () => { applyColors(); save(); })
+  );
+  msgEl.addEventListener('input', save);
+  msgEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); msgEl.blur(); }
+  });
+
+  // ── Boot ──────────────────────────────────────────────────
+  load();
+  applyColors();
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>
